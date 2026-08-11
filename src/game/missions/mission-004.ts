@@ -20,7 +20,6 @@ export const mission004: Mission = {
 
   preview: {
     entryFile: "index.html",
-    baseHref: "/mission-assets/orbit/",
   },
 
   files: [
@@ -46,6 +45,14 @@ export const mission004: Mission = {
   </body>
 </html>
 `,
+    },
+  ],
+
+  assets: [
+    {
+        path: "assets/logo.svg",
+        runtimePath: "/mission-assets/orbit/assets/logo.svg",
+        type: "image",
     },
   ],
 

@@ -1,49 +1,69 @@
-import {
-  Monitor,
-} from "lucide-react";
+import { Monitor } from "lucide-react";
 
 import { useCurrentMission } from "../../game/hooks/use-current-mission";
 
 import { useGameStore } from "../../store/use-game-store";
 
-function injectBaseHref(
+import type { Mission } from "../../types/game";
+
+function normalizeVirtualPath(path: string): string {
+  return path
+    .trim()
+    .replace(/^\.\/+/, "");
+}
+
+function resolveMissionAssets(
   html: string,
-  baseHref?: string,
+  mission: Mission,
 ): string {
-  if (!baseHref) {
+  if (!mission.assets?.length) {
     return html;
   }
 
-  const absoluteBase =
-    new URL(
-      baseHref,
+  const parser = new DOMParser();
+
+  const document = parser.parseFromString(
+    html,
+    "text/html",
+  );
+
+  const elementsWithSrc = Array.from(
+    document.querySelectorAll<HTMLElement>("[src]"),
+  );
+
+  for (const element of elementsWithSrc) {
+    const src = element.getAttribute("src");
+
+    if (!src) {
+      continue;
+    }
+
+    const normalizedSrc =
+      normalizeVirtualPath(src);
+
+    const asset = mission.assets.find(
+      (candidate) =>
+        normalizeVirtualPath(candidate.path) ===
+        normalizedSrc,
+    );
+
+    if (!asset) {
+      continue;
+    }
+
+    const runtimeUrl = new URL(
+      asset.runtimePath,
       window.location.href,
     ).href;
 
-  const baseTag =
-    `<base href="${absoluteBase}">`;
-
-  if (
-    /<head[\s>]/i.test(html)
-  ) {
-    return html.replace(
-      /<head([^>]*)>/i,
-
-      `<head$1>${baseTag}`,
+    element.setAttribute(
+      "src",
+      runtimeUrl,
     );
   }
 
-  if (
-    /<html[\s>]/i.test(html)
-  ) {
-    return html.replace(
-      /<html([^>]*)>/i,
-
-      `<html$1><head>${baseTag}</head>`,
-    );
-  }
-
-  return `<head>${baseTag}</head>${html}`;
+  return `<!doctype html>
+${document.documentElement.outerHTML}`;
 }
 
 export function PreviewPanel() {
@@ -61,8 +81,7 @@ export function PreviewPanel() {
   }
 
   const entryFile =
-    mission.preview
-      ?.entryFile ??
+    mission.preview?.entryFile ??
     mission.files.find(
       (file) =>
         file.language ===
@@ -71,16 +90,13 @@ export function PreviewPanel() {
 
   const html =
     entryFile
-      ? workspace[
-          entryFile
-        ] ?? ""
+      ? workspace[entryFile] ?? ""
       : "";
 
   const srcDoc =
-    injectBaseHref(
+    resolveMissionAssets(
       html,
-      mission.preview
-        ?.baseHref,
+      mission,
     );
 
   return (
@@ -114,9 +130,7 @@ export function PreviewPanel() {
           </div>
 
           <iframe
-            key={
-              mission.id
-            }
+            key={mission.id}
             title="Mission preview"
             srcDoc={srcDoc}
             sandbox=""

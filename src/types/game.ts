@@ -125,6 +125,8 @@ export interface Mission {
 
   files: MissionFile[];
 
+  assets?: MissionAsset[];
+
   objectives: MissionObjective[];
 
   testGroups: MissionTestGroup[];
@@ -146,4 +148,24 @@ export interface TestResult {
 export interface MissionStats {
   attempts: number;
   hintsUsed: number;
+}
+
+export interface MissionAsset {
+  /**
+   * Path visible to the player insider the virtual project
+   * 
+   * example:
+   * assets/logo.svg
+   */
+  path: string;
+
+  /**
+   * Actual path bundled with The Last Deploy
+   * 
+   * example:
+   * /mission-assets/orbit/logo.svg
+   */
+  runtimePath: string;
+
+  type: "image";
 }
