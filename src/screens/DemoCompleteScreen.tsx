@@ -36,7 +36,7 @@ export function DemoCompleteScreen() {
         </p>
 
         <h1 className="mt-3 text-3xl font-semibold text-white">
-          First five tickets complete.
+          First eight tickets complete.
         </h1>
 
         <p className="mt-4 text-sm leading-7 text-zinc-500">
@@ -65,18 +65,21 @@ export function DemoCompleteScreen() {
         </div>
 
         <div className="mt-6 rounded-lg border border-violet-400/10 bg-violet-400/5 p-4 text-left">
-          <p className="font-mono text-[10px] tracking-widest text-violet-300">
-            MAYA CHEN
-          </p>
+            <p className="font-mono text-[10px] tracking-widest text-violet-300">
+                MAYA CHEN
+            </p>
 
-          <p className="mt-2 text-sm leading-6 text-zinc-300">
-            I've got something
-            slightly bigger.
-          </p>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">
+                Apparently the Silverline form can be submitted completely empty.
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Guess what your next ticket is.
+            </p>
         </div>
 
         <p className="mt-8 font-mono text-[10px] tracking-[0.2em] text-zinc-700">
-          M0.2 COMPLETE
+            M0.3 COMPLETE
         </p>
 
         <button

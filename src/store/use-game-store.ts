@@ -13,6 +13,7 @@ import type {
   GamePhase,
   Mission,
   MissionStats,
+  SidebarView,
   TestResult,
 } from "../types/game";
 
@@ -26,6 +27,8 @@ interface GameState {
   workspace: Record<string, string>;
   activeFile: string | null;
 
+  sidebarView: SidebarView;
+
   testResults: TestResult[];
 
   attempts: number;
@@ -35,6 +38,29 @@ interface GameState {
 
   completedMissionIds: string[];
 
+  /**
+   * Stores the final player workspace for completed missions.
+   *
+   * This allows later missions to continue directly from
+   * the player's own previous solution.
+   *
+   * Example:
+   *
+   * Mission #006
+   *     ↓
+   * player modifies index.html
+   *     ↓
+   * mission resolved
+   *     ↓
+   * completedWorkspaces["html-006"]
+   *     ↓
+   * Mission #007 inherits it
+   */
+  completedWorkspaces: Record<
+    string,
+    Record<string, string>
+  >;
+
   missionStats: Record<
     string,
     MissionStats
@@ -42,11 +68,19 @@ interface GameState {
 
   startNewGame: () => void;
 
-  createPlayer: (name: string) => void;
+  createPlayer: (
+    name: string,
+  ) => void;
 
   startFirstMission: () => void;
 
-  setActiveFile: (path: string) => void;
+  setActiveFile: (
+    path: string,
+  ) => void;
+
+  setSidebarView: (
+    view: SidebarView,
+  ) => void;
 
   updateFile: (
     path: string,
@@ -66,31 +100,123 @@ interface GameState {
   resetGame: () => void;
 }
 
+/**
+ * Creates the initial workspace for a mission.
+ *
+ * Normally this simply uses the mission's starter files.
+ *
+ * If the mission inherits from a previous mission,
+ * the player's completed workspace is merged into
+ * the new mission.
+ */
 function createWorkspace(
   mission: Mission,
+
+  completedWorkspaces: Record<
+    string,
+    Record<string, string>
+  >,
 ): Record<string, string> {
-  return Object.fromEntries(
-    mission.files.map((file) => [
-      file.path,
-      file.content,
-    ]),
-  );
+  const workspace =
+    Object.fromEntries(
+      mission.files.map(
+        (file) => [
+          file.path,
+          file.content,
+        ],
+      ),
+    );
+
+  /**
+   * Normal standalone mission.
+   */
+  if (
+    !mission.inheritWorkspaceFrom
+  ) {
+    return workspace;
+  }
+
+  const inheritedWorkspace =
+    completedWorkspaces[
+      mission.inheritWorkspaceFrom
+    ];
+
+  /**
+   * This could happen when jumping directly
+   * into a mission during development.
+   *
+   * In that case we simply use the fallback
+   * starter files defined by the mission.
+   */
+  if (!inheritedWorkspace) {
+    return workspace;
+  }
+
+  /**
+   * Only inherit files which actually belong
+   * to the new mission.
+   *
+   * This prevents obsolete files from a previous
+   * mission leaking into another workspace.
+   */
+  const allowedPaths =
+    new Set(
+      mission.files.map(
+        (file) => file.path,
+      ),
+    );
+
+  for (const [
+    path,
+    content,
+  ] of Object.entries(
+    inheritedWorkspace,
+  )) {
+    if (
+      allowedPaths.has(path)
+    ) {
+      workspace[path] =
+        content;
+    }
+  }
+
+  return workspace;
 }
 
+/**
+ * Creates all temporary runtime state
+ * required when entering a mission.
+ */
 function createMissionRuntime(
   mission: Mission,
+
+  completedWorkspaces: Record<
+    string,
+    Record<string, string>
+  >,
 ) {
   return {
-    currentMissionId: mission.id,
+    currentMissionId:
+      mission.id,
 
-    workspace: createWorkspace(mission),
+    workspace:
+      createWorkspace(
+        mission,
+        completedWorkspaces,
+      ),
 
     activeFile:
-      mission.files[0]?.path ?? null,
+      mission.files[0]
+        ?.path ?? null,
 
-    testResults: [] as TestResult[],
+    sidebarView:
+      "ticket" as SidebarView,
+
+    testResults:
+      [] as TestResult[],
 
     attempts: 0,
+
     hintsRevealed: 0,
 
     missionPassed: false,
@@ -101,6 +227,12 @@ export const useGameStore =
   create<GameState>()(
     persist(
       (set, get) => ({
+        /**
+         * ------------------------------------------------
+         * INITIAL STATE
+         * ------------------------------------------------
+         */
+
         phase: "menu",
 
         playerName: "",
@@ -108,18 +240,30 @@ export const useGameStore =
         currentMissionId: null,
 
         workspace: {},
+
         activeFile: null,
+
+        sidebarView: "ticket",
 
         testResults: [],
 
         attempts: 0,
+
         hintsRevealed: 0,
 
         missionPassed: false,
 
         completedMissionIds: [],
 
+        completedWorkspaces: {},
+
         missionStats: {},
+
+        /**
+         * ------------------------------------------------
+         * NEW GAME
+         * ------------------------------------------------
+         */
 
         startNewGame: () => {
           set({
@@ -127,25 +271,44 @@ export const useGameStore =
 
             playerName: "",
 
-            currentMissionId: null,
+            currentMissionId:
+              null,
 
             workspace: {},
+
             activeFile: null,
+
+            sidebarView:
+              "ticket",
 
             testResults: [],
 
             attempts: 0,
+
             hintsRevealed: 0,
 
-            missionPassed: false,
+            missionPassed:
+              false,
 
-            completedMissionIds: [],
+            completedMissionIds:
+              [],
+
+            completedWorkspaces:
+              {},
 
             missionStats: {},
           });
         },
 
-        createPlayer: (name) => {
+        /**
+         * ------------------------------------------------
+         * PLAYER PROFILE
+         * ------------------------------------------------
+         */
+
+        createPlayer: (
+          name,
+        ) => {
           const trimmedName =
             name.trim();
 
@@ -161,36 +324,64 @@ export const useGameStore =
           });
         },
 
-        startFirstMission: () => {
-          const mission =
-            getFirstMission();
+        /**
+         * ------------------------------------------------
+         * FIRST MISSION
+         * ------------------------------------------------
+         */
 
-          set({
-            phase: "mission",
+        startFirstMission:
+          () => {
+            const mission =
+              getFirstMission();
 
-            ...createMissionRuntime(
-              mission,
-            ),
-          });
-        },
+            const state =
+              get();
 
-        setActiveFile: (path) => {
+            set({
+              phase:
+                "mission",
+
+              ...createMissionRuntime(
+                mission,
+                state.completedWorkspaces,
+              ),
+            });
+          },
+
+        /**
+         * ------------------------------------------------
+         * WORKSTATION
+         * ------------------------------------------------
+         */
+
+        setActiveFile: (
+          path,
+        ) => {
           const mission =
             getMissionById(
-              get().currentMissionId,
+              get()
+                .currentMissionId,
             );
 
           if (!mission) {
             return;
           }
 
-          const exists =
+          const fileExists =
             mission.files.some(
               (file) =>
-                file.path === path,
+                file.path ===
+                path,
             );
 
-          if (!exists) {
+          /**
+           * Assets are not editable files.
+           *
+           * This also prevents arbitrary paths
+           * from becoming the active editor model.
+           */
+          if (!fileExists) {
             return;
           }
 
@@ -199,24 +390,73 @@ export const useGameStore =
           });
         },
 
+        setSidebarView: (
+          view,
+        ) => {
+          set({
+            sidebarView:
+              view,
+          });
+        },
+
         updateFile: (
           path,
           content,
         ) => {
-          set((state) => ({
+          const state =
+            get();
+
+          const mission =
+            getMissionById(
+              state.currentMissionId,
+            );
+
+          if (!mission) {
+            return;
+          }
+
+          /**
+           * Only editable mission files can be changed.
+           */
+          const editable =
+            mission.files.some(
+              (file) =>
+                file.path ===
+                path,
+            );
+
+          if (!editable) {
+            return;
+          }
+
+          set({
             workspace: {
               ...state.workspace,
-              [path]: content,
+
+              [path]:
+                content,
             },
 
-            missionPassed: false,
+            /**
+             * Any code modification invalidates the
+             * previous test result.
+             */
+            missionPassed:
+              false,
 
             testResults: [],
-          }));
+          });
         },
 
+        /**
+         * ------------------------------------------------
+         * TESTS
+         * ------------------------------------------------
+         */
+
         runTests: () => {
-          const state = get();
+          const state =
+            get();
 
           const mission =
             getMissionById(
@@ -234,46 +474,66 @@ export const useGameStore =
             );
 
           const passed =
-            results.length > 0 &&
+            results.length >
+              0 &&
             results.every(
               (result) =>
                 result.passed,
             );
 
           set({
-            testResults: results,
+            testResults:
+              results,
 
             attempts:
-              state.attempts + 1,
+              state.attempts +
+              1,
 
             missionPassed:
               passed,
           });
         },
 
+        /**
+         * ------------------------------------------------
+         * HINTS
+         * ------------------------------------------------
+         */
+
         revealHint: () => {
+          const state =
+            get();
+
           const mission =
             getMissionById(
-              get().currentMissionId,
+              state.currentMissionId,
             );
 
           if (!mission) {
             return;
           }
 
-          set((state) => ({
+          set({
             hintsRevealed:
               Math.min(
                 state.hintsRevealed +
                   1,
 
-                mission.hints.length,
+                mission.hints
+                  .length,
               ),
-          }));
+          });
         },
 
+        /**
+         * ------------------------------------------------
+         * COMPLETE CURRENT MISSION
+         * ------------------------------------------------
+         */
+
         resolveMission: () => {
-          const state = get();
+          const state =
+            get();
 
           if (
             !state.missionPassed ||
@@ -285,10 +545,13 @@ export const useGameStore =
           const missionId =
             state.currentMissionId;
 
-          const completed =
+          const alreadyCompleted =
             state.completedMissionIds.includes(
               missionId,
-            )
+            );
+
+          const completedMissionIds =
+            alreadyCompleted
               ? state.completedMissionIds
               : [
                   ...state.completedMissionIds,
@@ -299,8 +562,21 @@ export const useGameStore =
             phase:
               "missionComplete",
 
-            completedMissionIds:
-              completed,
+            completedMissionIds,
+
+            /**
+             * Save exactly what the player wrote.
+             *
+             * The next mission can then inherit
+             * this workspace.
+             */
+            completedWorkspaces: {
+              ...state.completedWorkspaces,
+
+              [missionId]: {
+                ...state.workspace,
+              },
+            },
 
             missionStats: {
               ...state.missionStats,
@@ -316,9 +592,16 @@ export const useGameStore =
           });
         },
 
+        /**
+         * ------------------------------------------------
+         * CONTINUE CAMPAIGN
+         * ------------------------------------------------
+         */
+
         continueToNextMission:
           () => {
-            const state = get();
+            const state =
+              get();
 
             if (
               !state.currentMissionId
@@ -331,6 +614,9 @@ export const useGameStore =
                 state.currentMissionId,
               );
 
+            /**
+             * No more missions currently registered.
+             */
             if (!nextMission) {
               set({
                 phase:
@@ -341,18 +627,29 @@ export const useGameStore =
             }
 
             set({
-              phase: "mission",
+              phase:
+                "mission",
 
               ...createMissionRuntime(
                 nextMission,
+                state.completedWorkspaces,
               ),
             });
           },
 
+        /**
+         * ------------------------------------------------
+         * RESET CURRENT MISSION
+         * ------------------------------------------------
+         */
+
         resetMission: () => {
+          const state =
+            get();
+
           const mission =
             getMissionById(
-              get().currentMissionId,
+              state.currentMissionId,
             );
 
           if (!mission) {
@@ -362,9 +659,16 @@ export const useGameStore =
           set(
             createMissionRuntime(
               mission,
+              state.completedWorkspaces,
             ),
           );
         },
+
+        /**
+         * ------------------------------------------------
+         * RESET ENTIRE GAME
+         * ------------------------------------------------
+         */
 
         resetGame: () => {
           set({
@@ -372,19 +676,30 @@ export const useGameStore =
 
             playerName: "",
 
-            currentMissionId: null,
+            currentMissionId:
+              null,
 
             workspace: {},
+
             activeFile: null,
+
+            sidebarView:
+              "ticket",
 
             testResults: [],
 
             attempts: 0,
+
             hintsRevealed: 0,
 
-            missionPassed: false,
+            missionPassed:
+              false,
 
-            completedMissionIds: [],
+            completedMissionIds:
+              [],
+
+            completedWorkspaces:
+              {},
 
             missionStats: {},
           });
@@ -392,8 +707,15 @@ export const useGameStore =
       }),
 
       {
+        /**
+         * New save version for M0.3.
+         *
+         * We intentionally do not reuse the previous
+         * development save because the state schema
+         * changed significantly.
+         */
         name:
-          "the-last-deploy-save-v2",
+          "the-last-deploy-save-v3",
       },
     ),
   );

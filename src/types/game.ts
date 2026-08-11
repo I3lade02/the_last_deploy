@@ -12,6 +12,11 @@ export type MissionFileLanguage =
   | "javascript"
   | "typescript";
 
+export type SidebarView =
+  | "ticket"
+  | "files"
+  | "docs"
+
 export interface MissionFile {
   path: string;
   language: MissionFileLanguage;
@@ -65,7 +70,16 @@ export type EvaluationDefinition =
       selector: string;
       attribute: string;
       value: string;
-    };
+    }
+  | {
+    type: "elementCountAtLeast";
+    selector: string;
+    count: number;
+    }
+  | {
+    type: "allFieldsHaveLabels";
+    selector: string;
+  };
 
 export interface MissionTest {
   id: string;
@@ -127,6 +141,13 @@ export interface Mission {
 
   assets?: MissionAsset[];
 
+  /**
+   * Start this mission from the workspace
+   * produced by another completed mission
+   */
+
+  inheritWorkspaceFrom?: string;
+
   objectives: MissionObjective[];
 
   testGroups: MissionTestGroup[];
@@ -169,3 +190,21 @@ export interface MissionAsset {
 
   type: "image";
 }
+
+export interface DocumentationEntry {
+  id: string;
+
+  title: string;
+  category: string;
+
+  summary: string;
+
+  syntax?: string;
+
+  notes?: string[];
+
+  keywords: string[];
+
+  unlockAtMissionOrder: number;
+}
+

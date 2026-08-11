@@ -1,8 +1,6 @@
 import {
   CheckCircle2,
   Circle,
-  FileCode2,
-  Image,
   Lightbulb,
   RotateCcw,
 } from "lucide-react";
@@ -102,36 +100,6 @@ export function TicketPanel() {
               .description
           }
         </p>
-      </div>
-      
-      <div className="border-b border-zinc-800 p-5">
-        <p className="mb-4 font-mono text-[10px] tracking-[0.2em] text-zinc-600">
-          PROJECT FILES
-        </p>
-
-        <div className="space-y-2">
-          {mission.files.map((file) => (
-            <div
-              key={file.path}
-              className="flex items-center gap-2 font-mono text-xs text-zinc-500"
-            >
-              <FileCode2 className="size-3.5 text-orange-300" />
-
-              {file.path}
-            </div>
-          ))}
-
-          {mission.assets?.map((asset) => (
-            <div
-              key={asset.path}
-              className="flex items-center gap-2 font-mono text-xs text-zinc-500"
-            >
-              <Image className="size-3.5 text-violet-300" />
-
-              {asset.path}
-            </div>
-          ))}
-        </div>
       </div>
 
       <div className="border-b border-zinc-800 p-5">

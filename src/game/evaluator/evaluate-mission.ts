@@ -93,6 +93,64 @@ function evaluateDefinition(
       );
     }
 
+    case "elementCountAtLeast": {
+      return (
+        document.querySelectorAll(definition.selector).length >=
+        definition.count
+      );
+    }
+
+    case "allFieldsHaveLabels": {
+      const fields = Array.from(
+        document.querySelectorAll<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >(definition.selector),
+      );
+
+      if (fields.length === 0) {
+        return false;
+      }
+
+      const labels = Array.from(
+        document.querySelectorAll("label"),
+      );
+
+      return fields.every((field) => {
+        /**
+         * Variant 1:
+         *
+         * <label>
+         *   Name
+         *   <input>
+         * </label>
+         */
+        const wrappingLabel =
+          field.closest("label");
+
+        if (wrappingLabel) {
+          return true;
+        }
+
+        /**
+         * Variant 2:
+         *
+         * <label for="name">Name</label>
+         * <input id="name">
+         */
+        const id =
+          field.getAttribute("id");
+
+        if (!id) {
+          return false;
+        }
+
+        return labels.some(
+          (label) =>
+            label.getAttribute("for") === id,
+        );
+      });
+    }
+
     default: {
       return false;
     }
