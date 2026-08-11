@@ -2,6 +2,7 @@ import type { Mission } from "../../types/game";
 
 export const mission001: Mission = {
   id: "html-001",
+
   act: 1,
   order: 1,
 
@@ -43,11 +44,13 @@ export const mission001: Mission = {
       id: "main-heading",
       label: "Create a main heading",
       required: true,
+      testIds: ["main-heading-exists"],
     },
     {
       id: "company-name",
       label: 'The heading contains "GreenBean Café"',
       required: true,
+      testIds: ["main-heading-text"],
     },
   ],
 
@@ -55,11 +58,13 @@ export const mission001: Mission = {
     {
       id: "requirements",
       label: "Client requirements",
+
       tests: [
         {
           id: "main-heading-exists",
           label: "Main heading exists",
           visibility: "visible",
+
           evaluate: {
             type: "elementExists",
             selector: "h1",
@@ -70,6 +75,7 @@ export const mission001: Mission = {
           id: "main-heading-text",
           label: "Main heading contains company name",
           visibility: "visible",
+
           evaluate: {
             type: "textContains",
             selector: "h1",
@@ -81,6 +87,7 @@ export const mission001: Mission = {
           id: "single-main-heading",
           label: "Page contains one main heading",
           visibility: "hidden",
+
           evaluate: {
             type: "elementCount",
             selector: "h1",
@@ -105,8 +112,26 @@ export const mission001: Mission = {
 
     {
       id: "hint-3",
-      content: "A heading contains its text between an opening and closing tag.",
+      content:
+        "A heading contains its text between an opening and closing tag.",
       code: "<h1>GreenBean Café</h1>",
+    },
+  ],
+
+  completionMessages: [
+    {
+      sender: "Maya Chen",
+      role: "Project Manager",
+      initials: "MC",
+      content:
+        "Nice. You have officially modified production code.",
+    },
+    {
+      sender: "Maya Chen",
+      role: "Project Manager",
+      initials: "MC",
+      content:
+        "Try not to think about that too much.",
     },
   ],
 };

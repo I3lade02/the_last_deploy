@@ -2,10 +2,17 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { evaluateMission } from "../game/evaluator/evaluate-mission";
-import { mission001 } from "../game/missions/mission-001";
+
+import {
+  getFirstMission,
+  getMissionById,
+  getNextMission,
+} from "../game/missions";
 
 import type {
   GamePhase,
+  Mission,
+  MissionStats,
   TestResult,
 } from "../types/game";
 
@@ -26,6 +33,13 @@ interface GameState {
 
   missionPassed: boolean;
 
+  completedMissionIds: string[];
+
+  missionStats: Record<
+    string,
+    MissionStats
+  >;
+
   startNewGame: () => void;
 
   createPlayer: (name: string) => void;
@@ -34,7 +48,10 @@ interface GameState {
 
   setActiveFile: (path: string) => void;
 
-  updateFile: (path: string, content: string) => void;
+  updateFile: (
+    path: string,
+    content: string,
+  ) => void;
 
   runTests: () => void;
 
@@ -42,175 +59,341 @@ interface GameState {
 
   resolveMission: () => void;
 
+  continueToNextMission: () => void;
+
   resetMission: () => void;
 
   resetGame: () => void;
 }
 
-function createInitialWorkspace(): Record<string, string> {
+function createWorkspace(
+  mission: Mission,
+): Record<string, string> {
   return Object.fromEntries(
-    mission001.files.map((file) => [file.path, file.content]),
+    mission.files.map((file) => [
+      file.path,
+      file.content,
+    ]),
   );
 }
 
-export const useGameStore = create<GameState>()(
-  persist(
-    (set, get) => ({
-      phase: "menu",
+function createMissionRuntime(
+  mission: Mission,
+) {
+  return {
+    currentMissionId: mission.id,
 
-      playerName: "",
+    workspace: createWorkspace(mission),
 
-      currentMissionId: null,
+    activeFile:
+      mission.files[0]?.path ?? null,
 
-      workspace: {},
-      activeFile: null,
+    testResults: [] as TestResult[],
 
-      testResults: [],
+    attempts: 0,
+    hintsRevealed: 0,
 
-      attempts: 0,
-      hintsRevealed: 0,
+    missionPassed: false,
+  };
+}
 
-      missionPassed: false,
+export const useGameStore =
+  create<GameState>()(
+    persist(
+      (set, get) => ({
+        phase: "menu",
 
-      startNewGame: () => {
-        set({
-          phase: "onboarding",
+        playerName: "",
 
-          playerName: "",
+        currentMissionId: null,
 
-          currentMissionId: null,
+        workspace: {},
+        activeFile: null,
 
-          workspace: {},
-          activeFile: null,
+        testResults: [],
 
-          testResults: [],
+        attempts: 0,
+        hintsRevealed: 0,
 
-          attempts: 0,
-          hintsRevealed: 0,
+        missionPassed: false,
 
-          missionPassed: false,
-        });
-      },
+        completedMissionIds: [],
 
-      createPlayer: (name) => {
-        const trimmedName = name.trim();
+        missionStats: {},
 
-        if (!trimmedName) {
-          return;
-        }
+        startNewGame: () => {
+          set({
+            phase: "onboarding",
 
-        set({
-          playerName: trimmedName,
-          phase: "intro",
-        });
-      },
+            playerName: "",
 
-      startFirstMission: () => {
-        set({
-          phase: "mission",
+            currentMissionId: null,
 
-          currentMissionId: mission001.id,
+            workspace: {},
+            activeFile: null,
 
-          workspace: createInitialWorkspace(),
-          activeFile: mission001.files[0]?.path ?? null,
+            testResults: [],
 
-          testResults: [],
+            attempts: 0,
+            hintsRevealed: 0,
 
-          attempts: 0,
-          hintsRevealed: 0,
+            missionPassed: false,
 
-          missionPassed: false,
-        });
-      },
+            completedMissionIds: [],
 
-      setActiveFile: (path) => {
-        set({
-          activeFile: path,
-        });
-      },
+            missionStats: {},
+          });
+        },
 
-      updateFile: (path, content) => {
-        set((state) => ({
-          workspace: {
-            ...state.workspace,
-            [path]: content,
+        createPlayer: (name) => {
+          const trimmedName =
+            name.trim();
+
+          if (!trimmedName) {
+            return;
+          }
+
+          set({
+            playerName:
+              trimmedName,
+
+            phase: "intro",
+          });
+        },
+
+        startFirstMission: () => {
+          const mission =
+            getFirstMission();
+
+          set({
+            phase: "mission",
+
+            ...createMissionRuntime(
+              mission,
+            ),
+          });
+        },
+
+        setActiveFile: (path) => {
+          const mission =
+            getMissionById(
+              get().currentMissionId,
+            );
+
+          if (!mission) {
+            return;
+          }
+
+          const exists =
+            mission.files.some(
+              (file) =>
+                file.path === path,
+            );
+
+          if (!exists) {
+            return;
+          }
+
+          set({
+            activeFile: path,
+          });
+        },
+
+        updateFile: (
+          path,
+          content,
+        ) => {
+          set((state) => ({
+            workspace: {
+              ...state.workspace,
+              [path]: content,
+            },
+
+            missionPassed: false,
+
+            testResults: [],
+          }));
+        },
+
+        runTests: () => {
+          const state = get();
+
+          const mission =
+            getMissionById(
+              state.currentMissionId,
+            );
+
+          if (!mission) {
+            return;
+          }
+
+          const results =
+            evaluateMission(
+              mission,
+              state.workspace,
+            );
+
+          const passed =
+            results.length > 0 &&
+            results.every(
+              (result) =>
+                result.passed,
+            );
+
+          set({
+            testResults: results,
+
+            attempts:
+              state.attempts + 1,
+
+            missionPassed:
+              passed,
+          });
+        },
+
+        revealHint: () => {
+          const mission =
+            getMissionById(
+              get().currentMissionId,
+            );
+
+          if (!mission) {
+            return;
+          }
+
+          set((state) => ({
+            hintsRevealed:
+              Math.min(
+                state.hintsRevealed +
+                  1,
+
+                mission.hints.length,
+              ),
+          }));
+        },
+
+        resolveMission: () => {
+          const state = get();
+
+          if (
+            !state.missionPassed ||
+            !state.currentMissionId
+          ) {
+            return;
+          }
+
+          const missionId =
+            state.currentMissionId;
+
+          const completed =
+            state.completedMissionIds.includes(
+              missionId,
+            )
+              ? state.completedMissionIds
+              : [
+                  ...state.completedMissionIds,
+                  missionId,
+                ];
+
+          set({
+            phase:
+              "missionComplete",
+
+            completedMissionIds:
+              completed,
+
+            missionStats: {
+              ...state.missionStats,
+
+              [missionId]: {
+                attempts:
+                  state.attempts,
+
+                hintsUsed:
+                  state.hintsRevealed,
+              },
+            },
+          });
+        },
+
+        continueToNextMission:
+          () => {
+            const state = get();
+
+            if (
+              !state.currentMissionId
+            ) {
+              return;
+            }
+
+            const nextMission =
+              getNextMission(
+                state.currentMissionId,
+              );
+
+            if (!nextMission) {
+              set({
+                phase:
+                  "demoComplete",
+              });
+
+              return;
+            }
+
+            set({
+              phase: "mission",
+
+              ...createMissionRuntime(
+                nextMission,
+              ),
+            });
           },
 
-          missionPassed: false,
-        }));
+        resetMission: () => {
+          const mission =
+            getMissionById(
+              get().currentMissionId,
+            );
+
+          if (!mission) {
+            return;
+          }
+
+          set(
+            createMissionRuntime(
+              mission,
+            ),
+          );
+        },
+
+        resetGame: () => {
+          set({
+            phase: "menu",
+
+            playerName: "",
+
+            currentMissionId: null,
+
+            workspace: {},
+            activeFile: null,
+
+            testResults: [],
+
+            attempts: 0,
+            hintsRevealed: 0,
+
+            missionPassed: false,
+
+            completedMissionIds: [],
+
+            missionStats: {},
+          });
+        },
+      }),
+
+      {
+        name:
+          "the-last-deploy-save-v2",
       },
-
-      runTests: () => {
-        const workspace = get().workspace;
-
-        const results = evaluateMission(mission001, workspace);
-
-        const passed =
-          results.length > 0 &&
-          results.every((result) => result.passed);
-
-        set((state) => ({
-          testResults: results,
-          attempts: state.attempts + 1,
-          missionPassed: passed,
-        }));
-      },
-
-      revealHint: () => {
-        set((state) => ({
-          hintsRevealed: Math.min(
-            state.hintsRevealed + 1,
-            mission001.hints.length,
-          ),
-        }));
-      },
-
-      resolveMission: () => {
-        if (!get().missionPassed) {
-          return;
-        }
-
-        set({
-          phase: "complete",
-        });
-      },
-
-      resetMission: () => {
-        set({
-          workspace: createInitialWorkspace(),
-          activeFile: mission001.files[0]?.path ?? null,
-
-          testResults: [],
-
-          attempts: 0,
-          hintsRevealed: 0,
-
-          missionPassed: false,
-        });
-      },
-
-      resetGame: () => {
-        set({
-          phase: "menu",
-
-          playerName: "",
-
-          currentMissionId: null,
-
-          workspace: {},
-          activeFile: null,
-
-          testResults: [],
-
-          attempts: 0,
-          hintsRevealed: 0,
-
-          missionPassed: false,
-        });
-      },
-    }),
-    {
-      name: "the-last-deploy-save",
-    },
-  ),
-);
+    ),
+  );

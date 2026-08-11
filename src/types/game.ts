@@ -3,7 +3,8 @@ export type GamePhase =
   | "onboarding"
   | "intro"
   | "mission"
-  | "complete";
+  | "missionComplete"
+  | "demoComplete";
 
 export type MissionFileLanguage =
   | "html"
@@ -21,6 +22,12 @@ export interface MissionObjective {
   id: string;
   label: string;
   required: boolean;
+
+  /**
+   * Tests that have to pass before we consider
+   * this objective visually completed.
+   */
+  testIds?: string[];
 }
 
 export type EvaluationDefinition =
@@ -37,6 +44,21 @@ export type EvaluationDefinition =
       type: "textContains";
       selector: string;
       value: string;
+    }
+  | {
+      type: "elementsContainTexts";
+      selector: string;
+      values: string[];
+    }
+  | {
+      type: "attributeExists";
+      selector: string;
+      attribute: string;
+    }
+  | {
+      type: "attributeNotBlank";
+      selector: string;
+      attribute: string;
     }
   | {
       type: "attributeEquals";
@@ -72,19 +94,46 @@ export interface MissionBriefing {
   description: string;
 }
 
+export interface MissionMessage {
+  sender: string;
+  role: string;
+  initials: string;
+  content: string;
+}
+
+export interface MissionPreview {
+  entryFile?: string;
+
+  /**
+   * Optional virtual root used by srcDoc.
+   *
+   * Example:
+   * /mission-assets/orbit/
+   */
+  baseHref?: string;
+}
+
 export interface Mission {
   id: string;
+
   act: number;
   order: number;
 
   title: string;
+
   briefing: MissionBriefing;
 
   files: MissionFile[];
 
   objectives: MissionObjective[];
+
   testGroups: MissionTestGroup[];
+
   hints: MissionHint[];
+
+  preview?: MissionPreview;
+
+  completionMessages?: MissionMessage[];
 }
 
 export interface TestResult {
@@ -92,4 +141,9 @@ export interface TestResult {
   label: string;
   visibility: "visible" | "hidden";
   passed: boolean;
+}
+
+export interface MissionStats {
+  attempts: number;
+  hintsUsed: number;
 }

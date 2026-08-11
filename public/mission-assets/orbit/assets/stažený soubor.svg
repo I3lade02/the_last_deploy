@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="320" height="120">
+  <rect width="320" height="120" rx="18" fill="#111827"></rect>
+
+  <circle cx="62" cy="60" r="26" fill="none" stroke="#8b5cf6" stroke-width="8"></circle>
+
+  <ellipse cx="62" cy="60" rx="48" ry="17" fill="none" stroke="#a78bfa" stroke-width="4" transform="rotate(-18 62 60)"></ellipse>
+
+  <circle cx="104" cy="47" r="5" fill="#f9fafb"></circle>
+
+  <text x="126" y="55" fill="#f9fafb" font-family="Arial, sans-serif" font-size="25" font-weight="700">
+    ORBIT
+  </text>
+
+  <text x="126" y="78" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14" letter-spacing="2">
+    CREATIVE STUDIO
+  </text>
+</svg>

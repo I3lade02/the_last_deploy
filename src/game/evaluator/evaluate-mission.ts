@@ -5,8 +5,11 @@ import type {
   TestResult,
 } from "../../types/game";
 
-function normalizeText(value: string | null): string {
-  return (value ?? "").replace(/\s+/g, " ").trim();
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function evaluateDefinition(
@@ -20,7 +23,8 @@ function evaluateDefinition(
 
     case "elementCount": {
       return (
-        document.querySelectorAll(definition.selector).length === definition.count
+        document.querySelectorAll(definition.selector).length ===
+        definition.count
       );
     }
 
@@ -36,6 +40,46 @@ function evaluateDefinition(
       );
     }
 
+    case "elementsContainTexts": {
+      const elements = Array.from(
+        document.querySelectorAll(definition.selector),
+      );
+
+      const elementTexts = elements.map((element) =>
+        normalizeText(element.textContent),
+      );
+
+      return definition.values.every((expectedValue) => {
+        const normalizedExpected = normalizeText(expectedValue);
+
+        return elementTexts.some((text) =>
+          text.includes(normalizedExpected),
+        );
+      });
+    }
+
+    case "attributeExists": {
+      const element = document.querySelector(definition.selector);
+
+      if (!element) {
+        return false;
+      }
+
+      return element.hasAttribute(definition.attribute);
+    }
+
+    case "attributeNotBlank": {
+      const element = document.querySelector(definition.selector);
+
+      if (!element) {
+        return false;
+      }
+
+      const value = element.getAttribute(definition.attribute);
+
+      return normalizeText(value).length > 0;
+    }
+
     case "attributeEquals": {
       const element = document.querySelector(definition.selector);
 
@@ -43,7 +87,10 @@ function evaluateDefinition(
         return false;
       }
 
-      return element.getAttribute(definition.attribute) === definition.value;
+      return (
+        element.getAttribute(definition.attribute) ===
+        definition.value
+      );
     }
 
     default: {
@@ -52,7 +99,10 @@ function evaluateDefinition(
   }
 }
 
-function runTest(document: Document, test: MissionTest): TestResult {
+function runTest(
+  document: Document,
+  test: MissionTest,
+): TestResult {
   return {
     testId: test.id,
     label: test.label,
@@ -65,7 +115,15 @@ export function evaluateMission(
   mission: Mission,
   workspace: Record<string, string>,
 ): TestResult[] {
-  const html = workspace["index.html"];
+  const entryFile =
+    mission.preview?.entryFile ??
+    mission.files.find((file) => file.language === "html")?.path;
+
+  if (!entryFile) {
+    return [];
+  }
+
+  const html = workspace[entryFile];
 
   if (!html) {
     return [];
@@ -73,9 +131,14 @@ export function evaluateMission(
 
   const parser = new DOMParser();
 
-  const document = parser.parseFromString(html, "text/html");
+  const document = parser.parseFromString(
+    html,
+    "text/html",
+  );
 
   return mission.testGroups.flatMap((group) =>
-    group.tests.map((test) => runTest(document, test)),
+    group.tests.map((test) =>
+      runTest(document, test),
+    ),
   );
 }
