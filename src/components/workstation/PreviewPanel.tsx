@@ -18,6 +18,17 @@ import type { Mission } from "../../types/game";
 const PREVIEW_NAVIGATION_MESSAGE =
   "the-last-deploy-preview-navigate";
 
+interface PreviewSelection {
+  missionId: string;
+  path: string;
+}
+
+/**
+ * ------------------------------------------------
+ * PATH HELPERS
+ * ------------------------------------------------
+ */
+
 function normalizeVirtualPath(
   path: string,
 ): string {
@@ -28,11 +39,11 @@ function normalizeVirtualPath(
 }
 
 /**
- * Resolves a virtual relative path inside the player's project.
+ * Resolves relative project paths.
  *
  * Example:
  *
- * current:
+ * current file:
  * pages/about.html
  *
  * href:
@@ -55,10 +66,10 @@ function resolveVirtualPath(
   }
 
   /**
-   * Ignore URL schemes:
+   * Ignore real URL schemes.
    *
-   * https:
    * http:
+   * https:
    * mailto:
    * tel:
    * data:
@@ -82,7 +93,7 @@ function resolveVirtualPath(
     currentFile.split("/");
 
   /**
-   * Remove the current file name.
+   * Remove current filename.
    */
   currentParts.pop();
 
@@ -100,7 +111,10 @@ function resolveVirtualPath(
     ...baseParts,
   ];
 
-  for (const part of targetParts) {
+  for (
+    const part of
+    targetParts
+  ) {
     if (
       !part ||
       part === "."
@@ -108,8 +122,11 @@ function resolveVirtualPath(
       continue;
     }
 
-    if (part === "..") {
+    if (
+      part === ".."
+    ) {
       resolved.pop();
+
       continue;
     }
 
@@ -122,20 +139,25 @@ function resolveVirtualPath(
 }
 
 /**
- * Converts virtual asset paths used by the player
+ * ------------------------------------------------
+ * ASSET RESOLUTION
+ * ------------------------------------------------
+ */
+
+/**
+ * Converts the virtual paths used by the player's
+ * code into actual URLs used by the Tauri preview.
  *
- * assets/logo.svg
- *
- * into real runtime URLs used only by the preview.
- *
- * The player's source code is never modified.
+ * The source code stored in workspace is NOT modified.
  */
 function resolveMissionAssets(
   document: Document,
   mission: Mission,
   currentFile: string,
 ) {
-  if (!mission.assets?.length) {
+  if (
+    !mission.assets?.length
+  ) {
     return;
   }
 
@@ -146,7 +168,10 @@ function resolveMissionAssets(
       ),
     );
 
-  for (const element of elements) {
+  for (
+    const element of
+    elements
+  ) {
     const src =
       element.getAttribute(
         "src",
@@ -189,11 +214,111 @@ function resolveMissionAssets(
 }
 
 /**
- * Inject a tiny bridge into the preview.
- *
- * Relative page links are sent back to React
- * instead of trying to load real filesystem URLs.
+ * ------------------------------------------------
+ * VIRTUAL CSS
+ * ------------------------------------------------
  */
+
+/**
+ * Player files such as styles.css exist inside
+ * our virtual workspace, not as real files that
+ * the iframe can request.
+ *
+ * Therefore:
+ *
+ * <link rel="stylesheet" href="styles.css">
+ *
+ * is replaced ONLY inside the preview with:
+ *
+ * <style>...</style>
+ *
+ * The player's HTML remains unchanged.
+ */
+function injectVirtualStylesheets(
+  document: Document,
+  mission: Mission,
+
+  workspace: Record<
+    string,
+    string
+  >,
+
+  currentFile: string,
+) {
+  const links =
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[rel~="stylesheet"][href]',
+      ),
+    );
+
+  for (
+    const link of
+    links
+  ) {
+    const href =
+      link.getAttribute(
+        "href",
+      );
+
+    if (!href) {
+      continue;
+    }
+
+    const virtualPath =
+      resolveVirtualPath(
+        currentFile,
+        href,
+      );
+
+    if (!virtualPath) {
+      continue;
+    }
+
+    const cssFile =
+      mission.files.find(
+        (file) =>
+          file.path ===
+            virtualPath &&
+          file.language ===
+            "css",
+      );
+
+    if (!cssFile) {
+      continue;
+    }
+
+    const css =
+      workspace[
+        virtualPath
+      ] ??
+      cssFile.content;
+
+    const style =
+      document.createElement(
+        "style",
+      );
+
+    style.setAttribute(
+      "data-virtual-file",
+      virtualPath,
+    );
+
+    style.textContent =
+      css;
+
+    link.replaceWith(
+      style,
+    );
+  }
+}
+
+/**
+ * ------------------------------------------------
+ * VIRTUAL PAGE NAVIGATION
+ * ------------------------------------------------
+ */
+
 function injectNavigationBridge(
   document: Document,
 ) {
@@ -258,9 +383,21 @@ function injectNavigationBridge(
   );
 }
 
+/**
+ * ------------------------------------------------
+ * PREVIEW DOCUMENT
+ * ------------------------------------------------
+ */
+
 function createPreviewDocument(
   html: string,
   mission: Mission,
+
+  workspace: Record<
+    string,
+    string
+  >,
+
   currentFile: string,
 ): string {
   const parser =
@@ -278,6 +415,13 @@ function createPreviewDocument(
     currentFile,
   );
 
+  injectVirtualStylesheets(
+    document,
+    mission,
+    workspace,
+    currentFile,
+  );
+
   injectNavigationBridge(
     document,
   );
@@ -285,22 +429,36 @@ function createPreviewDocument(
   return `<!doctype html>${document.documentElement.outerHTML}`;
 }
 
-interface MissionPreviewFrameProps {
-  mission: Mission;
-  workspace: Record<string, string>;
-}
+/**
+ * ------------------------------------------------
+ * COMPONENT
+ * ------------------------------------------------
+ */
 
-function MissionPreviewFrame({
-  mission,
-  workspace,
-}: MissionPreviewFrameProps) {
+export function PreviewPanel() {
+  const mission =
+    useCurrentMission();
+
+  const workspace =
+    useGameStore(
+      (state) =>
+        state.workspace,
+    );
+
   const iframeRef =
     useRef<HTMLIFrameElement>(
       null,
     );
 
+  /**
+   * Determine initial preview page.
+   */
   const defaultEntryFile =
     useMemo(() => {
+      if (!mission) {
+        return null;
+      }
+
       return (
         mission.preview
           ?.entryFile ??
@@ -314,45 +472,60 @@ function MissionPreviewFrame({
     }, [mission]);
 
   const [
-    previewFile,
-    setPreviewFile,
-  ] = useState<string | null>(
-    defaultEntryFile,
-  );
+    previewSelection,
+    setPreviewSelection,
+  ] =
+    useState<PreviewSelection | null>(
+      null,
+    );
+
+  const selectedPreviewFile =
+    previewSelection
+      ? previewSelection.missionId ===
+        mission?.id
+        ? previewSelection.path
+        : null
+      : null;
 
   /**
-   * The parent keys this component by mission id.
-   * Entering another mission remounts the frame,
-   * which resets the local preview navigation state.
+   * Make sure the currently selected
+   * preview file actually exists.
    */
   const effectivePreviewFile =
     useMemo(() => {
+      if (!mission) {
+        return null;
+      }
+
       if (
-        previewFile &&
+        selectedPreviewFile &&
         mission.files.some(
           (file) =>
             file.path ===
-              previewFile &&
+              selectedPreviewFile &&
             file.language ===
               "html",
         )
       ) {
-        return previewFile;
+        return selectedPreviewFile;
       }
 
       return defaultEntryFile;
     }, [
       mission,
-      previewFile,
+      selectedPreviewFile,
       defaultEntryFile,
     ]);
 
   /**
-   * Receive navigation events from
-   * the sandboxed iframe.
+   * ------------------------------------------------
+   * RECEIVE NAVIGATION FROM IFRAME
+   * ------------------------------------------------
    */
+
   useEffect(() => {
     if (
+      !mission ||
       !effectivePreviewFile
     ) {
       return;
@@ -367,6 +540,10 @@ function MissionPreviewFrame({
     function handleMessage(
       event: MessageEvent,
     ) {
+      /**
+       * Only accept messages from
+       * our preview iframe.
+       */
       if (
         event.source !==
         iframeRef.current
@@ -411,8 +588,12 @@ function MissionPreviewFrame({
         return;
       }
 
-      setPreviewFile(
-        targetPath,
+      setPreviewSelection(
+        {
+          missionId:
+            currentMission.id,
+          path: targetPath,
+        },
       );
     }
 
@@ -432,7 +613,14 @@ function MissionPreviewFrame({
     effectivePreviewFile,
   ]);
 
+  /**
+   * ------------------------------------------------
+   * EMPTY STATE
+   * ------------------------------------------------
+   */
+
   if (
+    !mission ||
     !effectivePreviewFile
   ) {
     return (
@@ -443,6 +631,12 @@ function MissionPreviewFrame({
       </section>
     );
   }
+
+  /**
+   * ------------------------------------------------
+   * BUILD PREVIEW
+   * ------------------------------------------------
+   */
 
   const missionFile =
     mission.files.find(
@@ -462,8 +656,15 @@ function MissionPreviewFrame({
     createPreviewDocument(
       html,
       mission,
+      workspace,
       effectivePreviewFile,
     );
+
+  /**
+   * ------------------------------------------------
+   * RENDER
+   * ------------------------------------------------
+   */
 
   return (
     <section className="flex min-h-0 min-w-0 flex-col bg-[#0c0f15]">
@@ -496,34 +697,5 @@ function MissionPreviewFrame({
         />
       </div>
     </section>
-  );
-}
-
-export function PreviewPanel() {
-  const mission =
-    useCurrentMission();
-
-  const workspace =
-    useGameStore(
-      (state) =>
-        state.workspace,
-    );
-
-  if (!mission) {
-    return (
-      <section className="flex min-h-0 items-center justify-center bg-white">
-        <p className="font-mono text-xs text-zinc-500">
-          Preview unavailable.
-        </p>
-      </section>
-    );
-  }
-
-  return (
-    <MissionPreviewFrame
-      key={mission.id}
-      mission={mission}
-      workspace={workspace}
-    />
   );
 }

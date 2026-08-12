@@ -4,6 +4,7 @@ export type GamePhase =
   | "intro"
   | "mission"
   | "missionComplete"
+  | "actComplete"
   | "demoComplete";
 
 export type MissionFileLanguage =
@@ -122,9 +123,25 @@ export type EvaluationDefinition =
   | {
     type: "selectorsExist";
     selectors: string[];
+  }
+  | {
+    type: "cssSelectorExists";
+    selector: string;
+  }
+  | {
+    type: "cssProperty";
+
+    selector: string;
+    property: string;
+
+    mode:
+      | "exists"
+      | "notBlank"
+      | "equals"
+      | "contains";
+
+    value?: string;
   };
-
-
 export interface MissionTest {
   id: string;
   label: string;

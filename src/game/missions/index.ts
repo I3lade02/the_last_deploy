@@ -12,8 +12,16 @@ import { mission009 } from "./mission-009";
 import { mission010 } from "./mission-010";
 import { mission011 } from "./mission-011";
 import { mission012 } from "./mission-012";
+import { mission013 } from "./mission-013";
 
-export const missions: Mission[] = [
+/**
+ * ------------------------------------------------
+ * MISSION REGISTRY
+ * ------------------------------------------------
+ */
+
+export const missions:
+  Mission[] = [
     mission001,
     mission002,
     mission003,
@@ -26,48 +34,90 @@ export const missions: Mission[] = [
     mission010,
     mission011,
     mission012,
-].sort((a, b) => a.order - b.order);
+    mission013,
+  ].sort(
+    (a, b) =>
+      a.order - b.order,
+  );
 
-const missionMap = new Map(
-    missions.map((mission) => [
+/**
+ * Fast mission lookup by ID.
+ */
+const missionMap =
+  new Map<
+    string,
+    Mission
+  >(
+    missions.map(
+      (mission) => [
         mission.id,
         mission,
-    ]),
-);
+      ],
+    ),
+  );
+
+/**
+ * ------------------------------------------------
+ * GET MISSION
+ * ------------------------------------------------
+ */
 
 export function getMissionById(
-    id: string | null,
+  id:
+    | string
+    | null
+    | undefined,
 ): Mission | undefined {
-    if (!id) {
-        return undefined;
-    }
+  if (!id) {
+    return undefined;
+  }
 
-    return missionMap.get(id);
+  return missionMap.get(id);
 }
 
-export function getFirstMission(): Mission {
-    const mission = missions[0];
+/**
+ * ------------------------------------------------
+ * FIRST MISSION
+ * ------------------------------------------------
+ */
 
-    if (!mission) {
-        throw new Error(
-            "Mission registry contains no missions",
-        );
-    }
+export function getFirstMission():
+  Mission {
+  const mission =
+    missions[0];
 
-    return mission;
+  if (!mission) {
+    throw new Error(
+      "No missions are registered.",
+    );
+  }
+
+  return mission;
 }
+
+/**
+ * ------------------------------------------------
+ * NEXT MISSION
+ * ------------------------------------------------
+ */
 
 export function getNextMission(
-    currentMissionId: string,
+  currentMissionId: string,
 ): Mission | undefined {
-    const currentIndex = missions.findIndex(
-        (mission) =>
-            mission.id === currentMissionId,
+  const currentIndex =
+    missions.findIndex(
+      (mission) =>
+        mission.id ===
+        currentMissionId,
     );
 
-    if (currentIndex === -1) {
-        return undefined;
-    }
+  if (
+    currentIndex === -1
+  ) {
+    return undefined;
+  }
 
-    return missions[currentIndex + 1];
+  return missions[
+    currentIndex + 1
+  ];
 }

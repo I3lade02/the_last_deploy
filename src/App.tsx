@@ -36,10 +36,9 @@ export default function App() {
         <CompletionScreen />
       );
 
+    case "actComplete":
     case "demoComplete":
-      return (
-        <DemoCompleteScreen />
-      );
+      return <DemoCompleteScreen />;
 
     default:
       return <MainMenu />;

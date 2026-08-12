@@ -95,6 +95,8 @@ interface GameState {
 
   continueToNextMission: () => void;
 
+  continueToNextAct: () => void;
+
   resetMission: () => void;
 
   resetGame: () => void;
@@ -598,44 +600,81 @@ export const useGameStore =
          * ------------------------------------------------
          */
 
-        continueToNextMission:
-          () => {
-            const state =
-              get();
+        continueToNextMission: () => {
+          const state = get();
 
-            if (
-              !state.currentMissionId
-            ) {
-              return;
-            }
+          if (!state.currentMissionId) {
+            return;
+          }
 
-            const nextMission =
-              getNextMission(
-                state.currentMissionId,
-              );
+          const currentMission =
+            getMissionById(
+              state.currentMissionId,
+            );
 
-            /**
-             * No more missions currently registered.
-             */
-            if (!nextMission) {
-              set({
-                phase:
-                  "demoComplete",
-              });
+          if (!currentMission) {
+            return;
+          }
 
-              return;
-            }
+          const nextMission =
+          getNextMission(
+            state.currentMissionId,
+          );
 
+          if (!nextMission) {
             set({
-              phase:
-                "mission",
-
-              ...createMissionRuntime(
-                nextMission,
-                state.completedWorkspaces,
-              ),
+              phase: "demoComplete",
             });
-          },
+
+            return;
+          }
+
+          if (
+            nextMission.act >
+            currentMission.act
+          ) {
+            set({
+              phase: "actComplete",
+            });
+
+            return;
+          }
+
+          set({
+            phase: "mission",
+
+            ...createMissionRuntime(
+              nextMission,
+              state.completedWorkspaces,
+            ),
+          });
+        },
+
+        continueToNextAct: () => {
+          const state = get();
+
+          if (!state.currentMissionId) {
+            return;
+          }
+
+          const nextMission =
+            getNextMission(
+              state.currentMissionId,
+            );
+
+          if (!nextMission) {
+            return;
+          }
+
+          set({
+            phase: "mission",
+
+            ...createMissionRuntime(
+              nextMission,
+              state.completedWorkspaces,
+            ),
+          });
+        },
 
         /**
          * ------------------------------------------------

@@ -5,6 +5,12 @@ import type {
   TestResult,
 } from "../../types/game";
 
+/**
+ * ------------------------------------------------
+ * TEXT HELPERS
+ * ------------------------------------------------
+ */
+
 function normalizeText(
   value: string | null | undefined,
 ): string {
@@ -13,6 +19,12 @@ function normalizeText(
     .trim()
     .toLowerCase();
 }
+
+/**
+ * ------------------------------------------------
+ * FORM HELPERS
+ * ------------------------------------------------
+ */
 
 function findAssociatedFieldByLabel(
   document: Document,
@@ -23,17 +35,13 @@ function findAssociatedFieldByLabel(
   | HTMLSelectElement
   | null {
   const expectedValues =
-    labelIncludes.map(
-      (value) =>
-        normalizeText(value),
+    labelIncludes.map((value) =>
+      normalizeText(value),
     );
 
-  const labels =
-    Array.from(
-      document.querySelectorAll(
-        "label",
-      ),
-    );
+  const labels = Array.from(
+    document.querySelectorAll("label"),
+  );
 
   const matchingLabel =
     labels.find((label) => {
@@ -44,9 +52,7 @@ function findAssociatedFieldByLabel(
 
       return expectedValues.some(
         (expected) =>
-          text.includes(
-            expected,
-          ),
+          text.includes(expected),
       );
     });
 
@@ -64,9 +70,9 @@ function findAssociatedFieldByLabel(
    */
   const wrappedField =
     matchingLabel.querySelector<
-      HTMLInputElement |
-      HTMLTextAreaElement |
-      HTMLSelectElement
+      | HTMLInputElement
+      | HTMLTextAreaElement
+      | HTMLSelectElement
     >(
       "input, textarea, select",
     );
@@ -112,14 +118,191 @@ function findAssociatedFieldByLabel(
   return null;
 }
 
+/**
+ * ------------------------------------------------
+ * CSS HELPERS
+ * ------------------------------------------------
+ */
+
+function normalizeCssSelector(
+  value: string,
+): string {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeCssValue(
+  property: string,
+  value: string,
+): string {
+  /**
+   * Let the browser CSS parser normalize
+   * valid CSS values for us.
+   *
+   * This helps comparisons between equivalent
+   * CSS representations.
+   */
+  const element =
+    window.document.createElement(
+      "div",
+    );
+
+  element.style.setProperty(
+    property,
+    value,
+  );
+
+  const normalized =
+    element.style.getPropertyValue(
+      property,
+    );
+
+  return (
+    normalized || value
+  )
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getCssStyleRules(
+  source: string,
+): CSSStyleRule[] {
+  if (
+    typeof CSSStyleSheet ===
+    "undefined"
+  ) {
+    return [];
+  }
+
+  try {
+    const sheet =
+      new CSSStyleSheet();
+
+    sheet.replaceSync(source);
+
+    const result:
+      CSSStyleRule[] = [];
+
+    function visitRules(
+      rules: CSSRuleList,
+    ) {
+      for (
+        const rule of
+        Array.from(rules)
+      ) {
+        if (
+          rule.type ===
+          CSSRule.STYLE_RULE
+        ) {
+          result.push(
+            rule as CSSStyleRule,
+          );
+
+          continue;
+        }
+
+        /**
+         * Allows us to inspect rules nested
+         * inside things like @media later.
+         */
+        const nestedRules =
+          (
+            rule as CSSRule & {
+              cssRules?: CSSRuleList;
+            }
+          ).cssRules;
+
+        if (nestedRules) {
+          visitRules(
+            nestedRules,
+          );
+        }
+      }
+    }
+
+    visitRules(
+      sheet.cssRules,
+    );
+
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function findCssRules(
+  source: string,
+  selector: string,
+): CSSStyleRule[] {
+  const target =
+    normalizeCssSelector(
+      selector,
+    );
+
+  return getCssStyleRules(
+    source,
+  ).filter((rule) => {
+    /**
+     * Also supports:
+     *
+     * h1,
+     * h2 {
+     *   ...
+     * }
+     */
+    const selectors =
+      rule.selectorText
+        .split(",")
+        .map(
+          normalizeCssSelector,
+        );
+
+    return selectors.includes(
+      target,
+    );
+  });
+}
+
+/**
+ * ------------------------------------------------
+ * EVALUATION
+ * ------------------------------------------------
+ */
+
 function evaluateDefinition(
-  document: Document,
+  document: Document | null,
+  source: string,
   definition: EvaluationDefinition,
 ): boolean {
+  const requiresDocument =
+    definition.type !==
+      "cssSelectorExists" &&
+    definition.type !==
+      "cssProperty";
+
+  if (
+    requiresDocument &&
+    !document
+  ) {
+    return false;
+  }
+
+  const htmlDocument =
+    document as Document;
+
   switch (definition.type) {
+    /**
+     * ------------------------------------------------
+     * BASIC HTML
+     * ------------------------------------------------
+     */
+
     case "elementExists": {
       return (
-        document.querySelector(
+        htmlDocument.querySelector(
           definition.selector,
         ) !== null
       );
@@ -127,7 +310,7 @@ function evaluateDefinition(
 
     case "elementCount": {
       return (
-        document.querySelectorAll(
+        htmlDocument.querySelectorAll(
           definition.selector,
         ).length ===
         definition.count
@@ -136,16 +319,31 @@ function evaluateDefinition(
 
     case "elementCountAtLeast": {
       return (
-        document.querySelectorAll(
+        htmlDocument.querySelectorAll(
           definition.selector,
         ).length >=
         definition.count
       );
     }
 
+    case "selectorsExist": {
+      return definition.selectors.every(
+        (selector) =>
+          htmlDocument.querySelector(
+            selector,
+          ) !== null,
+      );
+    }
+
+    /**
+     * ------------------------------------------------
+     * TEXT
+     * ------------------------------------------------
+     */
+
     case "textContains": {
       const element =
-        document.querySelector(
+        htmlDocument.querySelector(
           definition.selector,
         );
 
@@ -162,20 +360,38 @@ function evaluateDefinition(
       );
     }
 
+    case "textNotContains": {
+      const element =
+        htmlDocument.querySelector(
+          definition.selector,
+        );
+
+      if (!element) {
+        return false;
+      }
+
+      return !normalizeText(
+        element.textContent,
+      ).includes(
+        normalizeText(
+          definition.value,
+        ),
+      );
+    }
+
     case "elementsContainTexts": {
       const elements =
         Array.from(
-          document.querySelectorAll(
+          htmlDocument.querySelectorAll(
             definition.selector,
           ),
         );
 
       const elementTexts =
-        elements.map(
-          (element) =>
-            normalizeText(
-              element.textContent,
-            ),
+        elements.map((element) =>
+          normalizeText(
+            element.textContent,
+          ),
         );
 
       return definition.values.every(
@@ -195,9 +411,15 @@ function evaluateDefinition(
       );
     }
 
+    /**
+     * ------------------------------------------------
+     * ATTRIBUTES
+     * ------------------------------------------------
+     */
+
     case "attributeExists": {
       const element =
-        document.querySelector(
+        htmlDocument.querySelector(
           definition.selector,
         );
 
@@ -212,7 +434,7 @@ function evaluateDefinition(
 
     case "attributeNotBlank": {
       const element =
-        document.querySelector(
+        htmlDocument.querySelector(
           definition.selector,
         );
 
@@ -233,7 +455,7 @@ function evaluateDefinition(
 
     case "attributeEquals": {
       const element =
-        document.querySelector(
+        htmlDocument.querySelector(
           definition.selector,
         );
 
@@ -253,10 +475,16 @@ function evaluateDefinition(
       );
     }
 
+    /**
+     * ------------------------------------------------
+     * FORMS
+     * ------------------------------------------------
+     */
+
     case "allFieldsHaveLabels": {
       const fields =
         Array.from(
-          document.querySelectorAll<
+          htmlDocument.querySelectorAll<
             | HTMLInputElement
             | HTMLTextAreaElement
             | HTMLSelectElement
@@ -273,7 +501,7 @@ function evaluateDefinition(
 
       const labels =
         Array.from(
-          document.querySelectorAll(
+          htmlDocument.querySelectorAll(
             "label",
           ),
         );
@@ -281,18 +509,27 @@ function evaluateDefinition(
       return fields.every(
         (field) => {
           /**
-           * Wrapped label
+           * Variant 1:
+           *
+           * <label>
+           *   Name
+           *   <input>
+           * </label>
            */
           if (
-            field.closest(
-              "label",
-            )
+            field.closest("label")
           ) {
             return true;
           }
 
           /**
-           * for / id association
+           * Variant 2:
+           *
+           * <label for="name">
+           *   Name
+           * </label>
+           *
+           * <input id="name">
            */
           const id =
             field.getAttribute(
@@ -316,7 +553,7 @@ function evaluateDefinition(
     case "formFieldAttribute": {
       const field =
         findAssociatedFieldByLabel(
-          document,
+          htmlDocument,
           definition.labelIncludes,
         );
 
@@ -346,6 +583,13 @@ function evaluateDefinition(
         }
 
         case "equals":
+          if (
+            definition.value ===
+            undefined
+          ) {
+            return false;
+          }
+
           return (
             normalizeText(
               field.getAttribute(
@@ -362,42 +606,54 @@ function evaluateDefinition(
       }
     }
 
+    /**
+     * ------------------------------------------------
+     * ACCESSIBILITY / STRUCTURE
+     * ------------------------------------------------
+     */
+
     case "headingOrderValid": {
-      const headings = Array.from(
-        document.querySelectorAll(
-          "h1, h2, h3, h4, h5, h6",
-        ),
-      );
-
-      if (headings.length === 0) {
-        return false;
-      }
-
-      const levels = headings.map(
-        (heading) =>
-          Number(
-            heading.tagName.substring(1),
+      const headings =
+        Array.from(
+          htmlDocument.querySelectorAll(
+            "h1, h2, h3, h4, h5, h6",
           ),
-      );
+        );
+
+      if (
+        headings.length === 0
+      ) {
+        return false;
+      }
+
+      const levels =
+        headings.map((heading) =>
+          Number(
+            heading.tagName.substring(
+              1,
+            ),
+          ),
+        );
 
       /**
-       * The document should begin its heading
-       * hierarchy with h1.
+       * The document hierarchy should
+       * begin with h1.
        */
-      if (levels[0] !== 1) {
+      if (
+        levels[0] !== 1
+      ) {
         return false;
       }
 
       /**
-       * Heading levels may move upward freely:
+       * Heading levels may move upwards freely,
+       * but should not skip levels going deeper.
        *
-       * h3 -> h2
-       * h2 -> h1
+       * h1 -> h2 = valid
+       * h2 -> h3 = valid
+       * h3 -> h2 = valid
        *
-       * But they should not skip levels downward:
-       *
-       * h1 -> h3
-       * h2 -> h4
+       * h1 -> h3 = invalid
        */
       for (
         let index = 1;
@@ -422,68 +678,142 @@ function evaluateDefinition(
     }
 
     case "internalLinksResolve": {
-      const links = Array.from(
-        document.querySelectorAll<HTMLAnchorElement>(
-          definition.selector,
-        ),
-      );
+      const links =
+        Array.from(
+          htmlDocument.querySelectorAll<HTMLAnchorElement>(
+            definition.selector,
+          ),
+        );
 
-      if (links.length === 0) {
+      if (
+        links.length === 0
+      ) {
         return false;
       }
 
-      return links.every((link) => {
-        const href =
-          link.getAttribute("href");
+      return links.every(
+        (link) => {
+          const href =
+            link.getAttribute(
+              "href",
+            );
 
-        if (
-          !href ||
-          !href.startsWith("#") ||
-          href === "#"
-        ) {
-          return false;
-        }
+          if (
+            !href ||
+            !href.startsWith(
+              "#",
+            ) ||
+            href === "#"
+          ) {
+            return false;
+          }
 
-        const targetId =
-          href.substring(1);
+          const targetId =
+            href.substring(1);
 
-        if (!targetId) {
-          return false;
-        }
+          if (!targetId) {
+            return false;
+          }
 
-        return (
-          document.getElementById(
-            targetId,
-          ) !== null
-        );
-      });
-    }
-
-    case "textNotContains": {
-      const element =
-        document.querySelector(
-          definition.selector,
-        );
-
-      if (!element) {
-        return false;
-      }
-
-      return !normalizeText(
-        element.textContent,
-      ).includes(
-        normalizeText(
-          definition.value,
-        ),
+          return (
+            htmlDocument.getElementById(
+              targetId,
+            ) !== null
+          );
+        },
       );
     }
 
-    case "selectorsExist": {
-      return definition.selectors.every(
-        (selector) => 
-          document.querySelector(
-            selector,
-          ) !== null,
+    /**
+     * ------------------------------------------------
+     * CSS
+     * ------------------------------------------------
+     */
+
+    case "cssSelectorExists": {
+      return (
+        findCssRules(
+          source,
+          definition.selector,
+        ).length > 0
+      );
+    }
+
+    case "cssProperty": {
+      const rules =
+        findCssRules(
+          source,
+          definition.selector,
+        );
+
+      if (
+        rules.length === 0
+      ) {
+        return false;
+      }
+
+      return rules.some(
+        (rule) => {
+          const value =
+            rule.style
+              .getPropertyValue(
+                definition.property,
+              )
+              .trim();
+
+          switch (
+            definition.mode
+          ) {
+            case "exists":
+              return (
+                rule.style.getPropertyValue(
+                  definition.property,
+                ) !== ""
+              );
+
+            case "notBlank":
+              return (
+                value.length > 0
+              );
+
+            case "equals":
+              if (
+                definition.value ===
+                undefined
+              ) {
+                return false;
+              }
+
+              return (
+                normalizeCssValue(
+                  definition.property,
+                  value,
+                ) ===
+                normalizeCssValue(
+                  definition.property,
+                  definition.value,
+                )
+              );
+
+            case "contains":
+              if (
+                definition.value ===
+                undefined
+              ) {
+                return false;
+              }
+
+              return value
+                .toLowerCase()
+                .includes(
+                  definition.value
+                    .toLowerCase(),
+                );
+
+            default:
+              return false;
+          }
+        },
       );
     }
 
@@ -492,26 +822,45 @@ function evaluateDefinition(
   }
 }
 
+/**
+ * ------------------------------------------------
+ * TEST RUNNER
+ * ------------------------------------------------
+ */
+
 function runTest(
-  document: Document,
+  document: Document | null,
+  source: string,
   test: MissionTest,
 ): TestResult {
   return {
-    testId: test.id,
-    label: test.label,
+    testId:
+      test.id,
+
+    label:
+      test.label,
+
     visibility:
       test.visibility,
 
     passed:
       evaluateDefinition(
         document,
+        source,
         test.evaluate,
       ),
   };
 }
 
+/**
+ * ------------------------------------------------
+ * MISSION EVALUATION
+ * ------------------------------------------------
+ */
+
 export function evaluateMission(
   mission: Mission,
+
   workspace: Record<
     string,
     string
@@ -524,15 +873,17 @@ export function evaluateMission(
       (file) =>
         file.language ===
         "html",
-    )?.path;
+    )?.path ??
+    mission.files[0]?.path;
 
   if (!defaultEntryFile) {
     return [];
   }
 
   /**
-   * Parse every HTML file only once,
-   * even when several tests use it.
+   * Parsed HTML documents are cached so that
+   * repeated tests on the same file do not
+   * repeatedly invoke DOMParser.
    */
   const documentCache =
     new Map<
@@ -544,20 +895,29 @@ export function evaluateMission(
     path: string,
   ): Document | null {
     const existing =
-      documentCache.get(
-        path,
-      );
+      documentCache.get(path);
 
     if (existing) {
       return existing;
     }
 
-    const html =
-      workspace[path];
+    const missionFile =
+      mission.files.find(
+        (file) =>
+          file.path === path,
+      );
 
-    if (!html) {
+    if (
+      !missionFile ||
+      missionFile.language !==
+        "html"
+    ) {
       return null;
     }
+
+    const html =
+      workspace[path] ??
+      missionFile.content;
 
     const parser =
       new DOMParser();
@@ -584,12 +944,14 @@ export function evaluateMission(
             test.filePath ??
             defaultEntryFile;
 
-          const document =
-            getDocument(
-              filePath,
+          const missionFile =
+            mission.files.find(
+              (file) =>
+                file.path ===
+                filePath,
             );
 
-          if (!document) {
+          if (!missionFile) {
             return {
               testId:
                 test.id,
@@ -600,12 +962,33 @@ export function evaluateMission(
               visibility:
                 test.visibility,
 
-              passed: false,
+              passed:
+                false,
             };
           }
 
+          /**
+           * Raw source is used by CSS tests.
+           */
+          const source =
+            workspace[filePath] ??
+            missionFile.content;
+
+          /**
+           * HTML tests receive a parsed document.
+           * CSS/plaintext/JS tests receive null.
+           */
+          const document =
+            missionFile.language ===
+            "html"
+              ? getDocument(
+                  filePath,
+                )
+              : null;
+
           return runTest(
             document,
+            source,
             test,
           );
         },

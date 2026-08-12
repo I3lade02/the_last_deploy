@@ -1,8 +1,8 @@
 [package]
-name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+name = "thelastdeploy"
+version = "0.1.1"
+description = "A coding game that should let players learn and practice HTML,CSS,JS,TS and probably some framework"
+authors = ["Berycode"]
 license = ""
 repository = ""
 edition = "2021"

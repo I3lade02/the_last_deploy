@@ -1,14 +1,17 @@
+import { cssDocumentation } from "./css-documentation";
 import { htmlDocumentation } from "./html-documentation";
 
 export const documentation = [
-    ...htmlDocumentation,
+  ...htmlDocumentation,
+  ...cssDocumentation,
 ];
 
 export function getDocumentationForMission(
-    missionOrder: number,
+  missionOrder: number,
 ) {
-    return documentation.filter(
-        (entry) => 
-            entry.unlockAtMissionOrder <= missionOrder,
-    );
+  return documentation.filter(
+    (entry) =>
+      entry.unlockAtMissionOrder <=
+      missionOrder,
+  );
 }
