@@ -3,6 +3,7 @@ import {
   FileCode2,
   FileImage,
   FolderOpen,
+  LockKeyhole,
 } from "lucide-react";
 
 import { useMemo } from "react";
@@ -19,11 +20,16 @@ interface TreeNode {
     | "file"
     | "asset";
 
+  readOnly?: boolean;
+
   children: TreeNode[];
 }
 
 function createTree(
-  files: string[],
+  files: {
+    path: string;
+    readOnly?: boolean;
+  }[],
   assets: string[],
 ): TreeNode[] {
   const root: TreeNode[] = [];
@@ -31,53 +37,62 @@ function createTree(
   function insert(
     path: string,
     type: "file" | "asset",
+    readOnly = false,
   ) {
     const parts = path.split("/");
 
     let current = root;
 
-    parts.forEach(
-      (part, index) => {
-        const isLast =
-          index === parts.length - 1;
+    parts.forEach((part, index) => {
+      const isLast =
+        index === parts.length - 1;
 
-        const currentPath =
-          parts
-            .slice(0, index + 1)
-            .join("/");
+      const currentPath = parts
+        .slice(0, index + 1)
+        .join("/");
 
-        let node = current.find(
-          (candidate) =>
-            candidate.name === part,
-        );
+      let node = current.find(
+        (candidate) =>
+          candidate.name === part,
+      );
 
-        if (!node) {
-          node = {
-            name: part,
-            path: currentPath,
+      if (!node) {
+        node = {
+          name: part,
+          path: currentPath,
 
-            type: isLast
-              ? type
-              : "folder",
+          type: isLast
+            ? type
+            : "folder",
 
-            children: [],
-          };
+          readOnly: isLast
+            ? readOnly
+            : false,
 
-          current.push(node);
-        }
+          children: [],
+        };
 
-        current = node.children;
-      },
-    );
+        current.push(node);
+      }
+
+      current = node.children;
+    });
   }
 
-  files.forEach((path) =>
-    insert(path, "file"),
-  );
+  files.forEach((file) => {
+    insert(
+      file.path,
+      "file",
+      file.readOnly,
+    );
+  });
 
-  assets.forEach((path) =>
-    insert(path, "asset"),
-  );
+  assets.forEach((path) => {
+    insert(
+      path,
+      "asset",
+    );
+  });
 
   return root;
 }
@@ -105,11 +120,16 @@ export function FileExplorerPanel() {
 
     return createTree(
       mission.files.map(
-        (file) => file.path,
+        (file) => ({
+          path: file.path,
+          readOnly:
+            file.readOnly,
+        }),
       ),
 
       mission.assets?.map(
-        (asset) => asset.path,
+        (asset) =>
+          asset.path,
       ) ?? [],
     );
   }, [mission]);
@@ -150,7 +170,7 @@ export function FileExplorerPanel() {
 
       <footer className="border-t border-zinc-800 px-4 py-3">
         <p className="font-mono text-[9px] leading-5 text-zinc-700">
-          Files marked as assets are read-only.
+          Files marked with a lock are read-only.
         </p>
       </footer>
     </div>
@@ -175,7 +195,12 @@ function FileNode({
   const isActive =
     node.path === activeFile;
 
-  if (node.type === "folder") {
+  /**
+   * Folder
+   */
+  if (
+    node.type === "folder"
+  ) {
     return (
       <div>
         <div
@@ -185,9 +210,11 @@ function FileNode({
               8 + depth * 14,
           }}
         >
-          <FolderOpen className="size-3.5 text-amber-300/70" />
+          <FolderOpen className="size-3.5 shrink-0 text-amber-300/70" />
 
-          {node.name}
+          <span className="truncate">
+            {node.name}
+          </span>
         </div>
 
         {node.children.map(
@@ -205,6 +232,10 @@ function FileNode({
     );
   }
 
+  /**
+   * Assets cannot currently be opened
+   * inside Monaco.
+   */
   const isAsset =
     node.type === "asset";
 
@@ -212,9 +243,13 @@ function FileNode({
     <button
       type="button"
       disabled={isAsset}
-      onClick={() =>
-        onOpenFile(node.path)
-      }
+      onClick={() => {
+        if (!isAsset) {
+          onOpenFile(
+            node.path,
+          );
+        }
+      }}
       className={[
         "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left font-mono text-xs transition",
 
@@ -237,9 +272,16 @@ function FileNode({
         <FileCode2 className="size-3.5 shrink-0 text-orange-300" />
       )}
 
-      <span className="truncate">
+      <span className="min-w-0 flex-1 truncate">
         {node.name}
       </span>
+
+      {node.readOnly && (
+        <LockKeyhole
+          className="size-3 shrink-0 text-zinc-600"
+          aria-label="Read only"
+        />
+      )}
     </button>
   );
 }

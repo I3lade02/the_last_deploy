@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120" viewBox="0 0 420 120">
+  <rect width="420" height="120" rx="12" fill="#111827"></rect>
+
+  <path d="M42 80 L72 35 L102 80" fill="none" stroke="#a7f3d0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+
+  <path d="M57 66 H87" stroke="#a7f3d0" stroke-width="6" stroke-linecap="round"></path>
+
+  <text x="130" y="70" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#f4f4f5">
+    ARCADIA
+  </text>
+
+  <text x="132" y="91" font-family="Arial, sans-serif" font-size="12" letter-spacing="4" fill="#71717a">
+    LIVING
+  </text>
+</svg>

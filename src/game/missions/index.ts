@@ -8,6 +8,10 @@ import { mission005 } from "./mission-005";
 import { mission006 } from "./mission-006";
 import { mission007 } from "./mission-007";
 import { mission008 } from "./mission-008";
+import { mission009 } from "./mission-009";
+import { mission010 } from "./mission-010";
+import { mission011 } from "./mission-011";
+import { mission012 } from "./mission-012";
 
 export const missions: Mission[] = [
     mission001,
@@ -18,6 +22,10 @@ export const missions: Mission[] = [
     mission006,
     mission007,
     mission008,
+    mission009,
+    mission010,
+    mission011,
+    mission012,
 ].sort((a, b) => a.order - b.order);
 
 const missionMap = new Map(

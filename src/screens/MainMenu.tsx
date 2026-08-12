@@ -39,7 +39,7 @@ export function MainMenu() {
         </button>
 
         <p className="mt-10 font-mono text-[10px] tracking-widest text-zinc-700">
-          BUILD M0.3
+          BUILD M0.5
         </p>
       </section>
     </main>

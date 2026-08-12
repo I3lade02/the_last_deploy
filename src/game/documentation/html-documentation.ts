@@ -320,4 +320,41 @@ export const htmlDocumentation: DocumentationEntry[] = [
 
     unlockAtMissionOrder: 8,
   },
+  {
+  id:
+    "html-form-attributes",
+
+  title:
+    "Form Field Attributes",
+
+  category:
+    "HTML / Forms",
+
+  summary:
+    "Form controls use attributes to describe the data they contain and how the browser should validate it.",
+
+  syntax: `<input
+  name="email"
+  type="email"
+  required
+>`,
+
+  notes: [
+    "name identifies a field when form data is submitted.",
+    'type="email" enables browser validation appropriate for email addresses.',
+    "required prevents form submission when a field is empty.",
+  ],
+
+  keywords: [
+    "name",
+    "required",
+    "type",
+    "email",
+    "validation",
+    "form",
+  ],
+
+  unlockAtMissionOrder:
+    9,
+  },
 ];

@@ -2,10 +2,10 @@ import Editor from "@monaco-editor/react";
 
 import {
   FileCode2,
+  LockKeyhole,
 } from "lucide-react";
 
 import { useCurrentMission } from "../../game/hooks/use-current-mission";
-
 import { useGameStore } from "../../store/use-game-store";
 
 export function CodeWorkspace() {
@@ -36,10 +36,7 @@ export function CodeWorkspace() {
         state.updateFile,
     );
 
-  if (
-    !mission ||
-    !activeFile
-  ) {
+  if (!mission) {
     return null;
   }
 
@@ -51,17 +48,30 @@ export function CodeWorkspace() {
     );
 
   if (!activeMissionFile) {
-    return null;
+    return (
+      <section className="flex min-h-0 flex-1 items-center justify-center border-r border-zinc-800 bg-[#0b0e13]">
+        <p className="font-mono text-xs text-zinc-700">
+          No file selected.
+        </p>
+      </section>
+    );
   }
 
+  const value =
+    workspace[
+      activeMissionFile.path
+    ] ??
+    activeMissionFile.content;
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-[#0b0e13]">
-      <div className="flex h-10 shrink-0 items-end border-b border-zinc-800 bg-[#090c11]">
+    <section className="flex min-h-0 flex-1 flex-col border-r border-zinc-800 bg-[#0b0e13]">
+      {/* File tabs */}
+      <div className="flex h-10 shrink-0 items-stretch overflow-x-auto border-b border-zinc-800 bg-[#090c11]">
         {mission.files.map(
           (file) => {
-            const isActive =
-              activeFile ===
-              file.path;
+            const active =
+              file.path ===
+              activeFile;
 
             return (
               <button
@@ -73,53 +83,81 @@ export function CodeWorkspace() {
                   )
                 }
                 className={[
-                  "flex h-full items-center gap-2 border-r border-zinc-800 px-4 font-mono text-[11px]",
+                  "flex shrink-0 items-center gap-2 border-r border-zinc-800 px-3 font-mono text-[11px] transition",
 
-                  isActive
-                    ? "border-t-2 border-t-emerald-400 bg-[#11151c] text-zinc-200"
-                    : "border-t-2 border-t-transparent text-zinc-600 hover:bg-zinc-900/50 hover:text-zinc-400",
+                  active
+                    ? "bg-[#0f131a] text-zinc-200"
+                    : "bg-[#090c11] text-zinc-600 hover:bg-zinc-900 hover:text-zinc-400",
                 ].join(" ")}
               >
-                <FileCode2 className="size-3.5 text-orange-300" />
+                <FileCode2
+                  className={[
+                    "size-3.5",
 
-                {file.path}
+                    active
+                      ? "text-orange-300"
+                      : "text-zinc-700",
+                  ].join(" ")}
+                />
+
+                <span>
+                  {file.path}
+                </span>
+
+                {file.readOnly && (
+                  <LockKeyhole
+                    className="size-3 text-zinc-600"
+                    aria-label="Read only"
+                  />
+                )}
               </button>
             );
           },
         )}
       </div>
 
+      {/* Small read-only notice */}
+      {activeMissionFile.readOnly && (
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-amber-400/10 bg-amber-400/3 px-3">
+          <LockKeyhole className="size-3 text-amber-400/60" />
+
+          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-amber-300/50">
+            Read only
+          </span>
+        </div>
+      )}
+
+      {/* Monaco */}
       <div className="min-h-0 flex-1">
         <Editor
-          /**
-           * Important:
-           *
-           * index.html exists in many missions.
-           *
-           * Monaco therefore gets a unique
-           * virtual path for every mission.
-           */
-          path={`${mission.id}/${activeFile}`}
+          path={`${mission.id}/${activeMissionFile.path}`}
           language={
             activeMissionFile.language
           }
-          value={
-            workspace[
-              activeFile
-            ] ?? ""
-          }
-          onChange={(value) =>
+          value={value}
+          onChange={(nextValue) => {
+            if (
+              activeMissionFile.readOnly
+            ) {
+              return;
+            }
+
             updateFile(
-              activeFile,
-              value ?? "",
-            )
-          }
+              activeMissionFile.path,
+              nextValue ?? "",
+            );
+          }}
           theme="vs-dark"
           options={{
             automaticLayout:
               true,
 
+            readOnly:
+              activeMissionFile.readOnly ??
+              false,
+
             fontSize: 14,
+
             lineHeight: 22,
 
             fontFamily:
@@ -140,6 +178,9 @@ export function CodeWorkspace() {
 
             tabSize: 2,
 
+            insertSpaces:
+              true,
+
             renderLineHighlight:
               "line",
 
@@ -149,10 +190,14 @@ export function CodeWorkspace() {
             cursorSmoothCaretAnimation:
               "on",
 
-            bracketPairColorization:
-              {
-                enabled: true,
-              },
+            bracketPairColorization: {
+              enabled: true,
+            },
+
+            readOnlyMessage: {
+              value:
+                "This file is read-only.",
+            },
           }}
         />
       </div>

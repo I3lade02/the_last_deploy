@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "The Last Deploy",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "version": "0.0.5",
+  "identifier": "cz.bery.thelastdeploy",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

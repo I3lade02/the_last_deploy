@@ -421,8 +421,8 @@ export const useGameStore =
           const editable =
             mission.files.some(
               (file) =>
-                file.path ===
-                path,
+                file.path === path &&
+                !file.readOnly,
             );
 
           if (!editable) {

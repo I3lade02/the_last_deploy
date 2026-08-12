@@ -10,7 +10,8 @@ export type MissionFileLanguage =
   | "html"
   | "css"
   | "javascript"
-  | "typescript";
+  | "typescript"
+  | "plaintext";
 
 export type SidebarView =
   | "ticket"
@@ -21,6 +22,12 @@ export interface MissionFile {
   path: string;
   language: MissionFileLanguage;
   content: string;
+
+  /**
+   * File can be opened and inspected,
+   * but cannot be modified by the player
+   */
+  readOnly?: boolean;
 }
 
 export interface MissionObjective {
@@ -79,13 +86,58 @@ export type EvaluationDefinition =
   | {
     type: "allFieldsHaveLabels";
     selector: string;
+  }
+  | {
+    type: "formFieldAttribute";
+
+    /**
+     * At least one of these values must occur
+     * inside the associated label
+     * 
+     * Matching is case insensitive
+     */
+    labelIncludes: string[];
+
+    attribute: string;
+
+    mode:
+      | "exists"
+      | "notBlank"
+      | "equals";
+
+    value?: string;
+  }
+  | {
+    type: "headingOrderValid";
+  }
+  | {
+    type: "internalLinksResolve";
+    selector: string;
+  }
+  | {
+    type: "textNotContains";
+    selector: string;
+    value: string;
+  }
+  | {
+    type: "selectorsExist";
+    selectors: string[];
   };
+
 
 export interface MissionTest {
   id: string;
   label: string;
   visibility: "visible" | "hidden";
   evaluate: EvaluationDefinition;
+
+  /**
+   * HTML file evaluated by this test
+   * 
+   * if omitted, mission.preview.entryFile
+   * or the first HTML file is used
+   */
+  filePath?: string;
 }
 
 export interface MissionTestGroup {

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#172033"></rect>
+
+  <rect x="150" y="130" width="340" height="160" rx="8" fill="#e2e8f0"></rect>
+
+  <path d="M120 150 L320 55 L520 150" fill="#94a3b8"></path>
+
+  <rect x="290" y="215" width="60" height="75" fill="#475569"></rect>
+
+  <rect x="190" y="175" width="55" height="45" fill="#38bdf8"></rect>
+
+  <rect x="395" y="175" width="55" height="45" fill="#38bdf8"></rect>
+
+  <text x="320" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#cbd5e1">
+    Horizon Community Center
+  </text>
+</svg>
